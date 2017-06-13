@@ -74,6 +74,7 @@ gems:
   - jekyll-paginate
 
 exclude:
+  - circle.yml
   - Gemfile
   - Gemfile.lock
   - LICENSE.md
