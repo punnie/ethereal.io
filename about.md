@@ -3,9 +3,9 @@ title: About
 permalink: /about/
 ---
 
-![Idiot in Venice](/images/about_venice.jpg)
+![Pedro in Venice Beach](/images/about_venice.jpg)
 
-This jackass is Pedro Coelho. He was in Venice Beach at that time.
+This is Pedro Coelho (/kuˈeʎu/). He was in Venice Beach at that time.
 
 Infrastructure engineer with a software engineering background, a strong support for the DevOps movement, and some particular interests:
 
