@@ -38,8 +38,6 @@ kramdown:
 nav:
   - name:           "About"
     url:            "/about/index.html"
-  - name:           "Guide"
-    url:            "/guide/index.html"
   - name:           "Archive"
     url:            "/archive/index.html"
   - name:           "Tags"
