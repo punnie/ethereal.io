@@ -37,11 +37,11 @@ kramdown:
 # Navigation
 nav:
   - name:           "About"
-    url:            "/about/index.html"
+    url:            "/about/"
   - name:           "Archive"
-    url:            "/archive/index.html"
+    url:            "/archive/"
   - name:           "Tags"
-    url:            "/tags/index.html"
+    url:            "/tags/"
   - name:           "Github"
     url:            "https://github.com/punnie"
 
