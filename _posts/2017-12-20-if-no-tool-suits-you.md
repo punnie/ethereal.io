@@ -1,7 +1,8 @@
 ---
 layout: post
-title:  "If no tool suits your need, maybe it's you"
-date:   2017-12-20 16:16:01 -0000
+title: If no tool suits your need, maybe it's you
+date: 2017-12-20 16:16:01 -0000
+description: Reflection about how market trends can sometime hide best practices
 tags: devops practices
 ---
 
