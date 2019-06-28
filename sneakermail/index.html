@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv='content-type' content='text/html;charset=utf-8'>
+    <title>email</title>
+    <link rel=stylesheet href="rocco.css">
+</head>
+<body>
+<div id=container>
+    <div id=background></div>
+    <table cellspacing=0 cellpadding=0>
+    <thead>
+      <tr>
+        <th class=docs><h1>email</h1></th>
+        <th class=code></th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr><td class='docs'><h1>Email me maybe</h1>
+
+<p>Here is the full command history, plus a few, that I used
+to create the email server live in front of a real audience.</p>
+
+<p>Feel free to use it to create an email server yourself, but
+please notice the following caveats:</p>
+
+<ul>
+<li>Replace the <code>sneakermail.net</code> domain with yours. I could have
+used variable substitution and replace it with ${DOMAIN}
+throughout the script, but the intent here is for you to
+understand the steps, and ultimately I felt that it impaired
+understandability.</li>
+<li>Replace the user if you so wish</li>
+<li>Don't run this as a script, but copy the commands one by
+one and try to understand what they do meanwhile.</li>
+</ul>
+
+<p>If you're in for a quick solution there are already a ton
+of them online, namely <a href="https://mailinabox.email/">Mail-in-a-Box</a>
+that have a lot more bells and whistles, including webmail
+and advanced spam and virus protection through <code>spamassassin</code> and
+<code>ClamAV</code>.</p>
+
+<p>So although this makes up for a pretty sturdy single usage
+email server, use this script to learn, not necessarily to
+deploy a production grade service.</p>
+
+</td><td class=code><div class=highlight><pre>
+<span class="c">#!/bin/bash</span>
+
+
+whoami
+
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Configuring postfix</h1>
+
+<p>Install <code>postfix</code>, our mail transfer agent. When running
+the configuration screen choose 'Internet Site' as your
+installation type, and then type your domain name in the
+following dialogue, in our case 'sneakermail.net'.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+apt install postfix
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Install <code>mailutils</code> and <code>mutt</code>, two small MUAs that we
+can use to check our email on the server itself, after
+we connect to it via SSH.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+apt install mailutils mutt
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Install <code>dovecot</code>, our MDA that will provide IMAP4 and
+POP3 so we can check our email on our cell phones and
+laptops, and will provide authentication to our MTA
+so spammers don't abuse our server.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+apt install dovecot-common dovecot-imapd dovecot-pop3d
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> about the domain it is managing.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s2">&quot;mydomain = sneakermail.net&quot;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> where to store messages, in our case we'll
+store the messages as files on each user's home directory,
+in a directory called "Maildir". If you change this remember
+to change it as well in later parts of the guide, namely
+dovecot's mail location and mutt's.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;home_mailbox = Maildir/&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Install LetsEncrypt to provide us with certificates
+so that we can make communications coming in the server
+secure. This will make people that connect to the server
+to deliver us email more at ease by knowing that they're
+connecting to the right place, and make us less prone
+to hacking attempts.</p>
+
+<p>Notice that we're passing the hostname (the name of the
+computer where our server is running) and not our email
+domain here. This is important.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+apt install certbot
+certbot certonly --standalone -d mx.sneakermail.net
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> where the generated certificates are. Remember
+that this may change according to your own configuration and
+domain. See the previous <code>certbot</code> command output to understand
+where those files were stored.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s2">&quot;smtpd_tls_cert_file = /etc/letsencrypt/live/mx.sneakermail.net/fullchain.pem&quot;</span>
+postconf -e <span class="s2">&quot;smtpd_tls_key_file = /etc/letsencrypt/live/mx.sneakermail.net/privkey.pem&quot;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> to use TLS (secure communications).</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;smtp_tls_security_level = may&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_tls_security_level = may&#39;</span>
+postconf -e <span class="s1">&#39;smtp_tls_note_starttls_offer = yes&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_tls_loglevel = 1&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_tls_received_header = yes&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> to use <code>dovecot</code> to authenticate users trying
+to send email through our server. This is important to prevent
+spammers and unauthorized users from abusing our server and
+others.</p>
+
+<p><em>Don't leave your server out in the open!</em> It will make big
+providers like GMail block you, making you unable to send them
+any email, and might even leave you liable to prosecution.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+
+postconf -e <span class="s1">&#39;smtpd_sasl_type = dovecot&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_sasl_path = private/auth&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_sasl_local_domain =&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_sasl_security_options = noanonymous&#39;</span>
+postconf -e <span class="s1">&#39;broken_sasl_auth_clients = yes&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_sasl_auth_enable = yes&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_recipient_restrictions =permit_sasl_authenticated,permit_mynetworks,reject_unauth_destination&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> you want virtual aliases. Virtual aliases are
+email aliases. Let's suppose you have one user, in our case
+<code>pedro</code> but want that user to receive email from several addresses
+like <code>info@sneakermail.net</code>, or <code>contact@sneakermail.net</code>. All you
+need is to set up an alias pointing those addresses to <code>pedro</code>'s
+mail box.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;virtual_alias_domains = $mydomain&#39;</span>
+postconf -e <span class="s1">&#39;virtual_alias_maps = hash:/etc/postfix/virtual&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Edit the file where the virtual aliases will be stored. The
+following command just replaces the contents of the file
+<code>/etc/postfix/virtual</code> with the lines up to <code>EOF</code>.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+cat <span class="s">&lt;&lt; EOF &gt; /etc/postfix/virtual</span>
+<span class="s">postmaster@sneakermail.net root</span>
+<span class="s">root@sneakermail.net root</span>
+<span class="s">info@sneakermail.net pedro</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>After updating the virtual alias file you <em>must</em> run postmap
+on it, as <code>postfix</code> needs this file to be in a specific format
+and won't read it itself until you tun this command.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postmap /etc/postfix/virtual
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Finally restart <code>postfix</code>, and you should be done with it for now.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+systemctl restart postfix
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Creating mail boxes</h1>
+
+<p>Create a mailbox structure for users that will be created
+in the future. This will create a Drafts, Sent, Trash and
+templates folder in every mail box in users created from
+here on. If you already have users this won't apply to them.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+maildirmake.dovecot /etc/skel/Maildir
+maildirmake.dovecot /etc/skel/Maildir/.Drafts
+maildirmake.dovecot /etc/skel/Maildir/.Sent
+maildirmake.dovecot /etc/skel/Maildir/.Trash
+maildirmake.dovecot /etc/skel/Maildir/.Templates
+
+<span class="nb">echo</span> <span class="s1">&#39;export MAIL=~/Maildir&#39;</span> | sudo tee -a /etc/bash.bashrc | sudo tee -a /etc/profile.d/mail.sh
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Create a user to receive our mail and their respective
+mail box.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+useradd -m -s /bin/bash pedro
+
+cp -r /etc/skel/Maildir /home/pedro/
+chown -R pedro:pedro /home/pedro/Maildir
+chmod -R 700 /home/pedro/Maildir
+adduser pedro mail
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Set a password for the user we created. Remember this password,
+it will be the one you'll use when configuring your phone to receive
+email, for example.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+passwd pedro
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Configuring dovecot</h1>
+
+</td><td class=code><div class=highlight><pre>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>dovecot</code> that we don't want to enable authentication in
+plaintext, only through a more secure mechanism. This is more
+of a technicality but makes you more secure. Also tell it
+that it may use our login user/password to perform that
+authentication. That's how the password we set for our user
+gets in the system.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+vim /etc/dovecot/conf.d/10-auth.conf
+
+<span class="c">#/ Find and change the following lines:</span>
+<span class="c">#/</span>
+<span class="c">#/ disable_plaintext_auth = yes</span>
+<span class="c">#/ auth_mechanisms = plain login</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell dovecot where messages are stored. If you changed this in
+postfix you'll also have to change it here. If you forget you'll
+still receive and send email in the server without problems,
+but won't be able to access it from the outside in your phone
+or computer via IMAP4 because dovecot will be looking for it in
+the wrong place.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+vim /etc/dovecot/conf.d/10-mail.conf
+
+<span class="c">#/ Find and change the following lines:</span>
+<span class="c">#/</span>
+<span class="c">#/ mail_location = maildir:~/Maildir</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell dovecot which services we need, which will only be IMAP4
+for us to access our messages without having to SSH into the
+server, and auth to help <code>postfix</code> with the authentication we
+set up earlier.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+vim /etc/dovecot/conf.d/10-master.conf
+
+<span class="c">#/ Find and change the following lines:</span>
+<span class="c">#/</span>
+<span class="c">#/ service imap-login {</span>
+<span class="c">#/    inet_listener imap {</span>
+<span class="c">#/       port = 143</span>
+<span class="c">#/    }</span>
+<span class="c">#/ }</span>
+<span class="c">#/</span>
+<span class="c">#/ service auth {</span>
+<span class="c">#/    unix_listener /var/spool/postfix/private/auth {</span>
+<span class="c">#/       mode = 0660</span>
+<span class="c">#/       user = postfix</span>
+<span class="c">#/       group = postfix</span>
+<span class="c">#/    }</span>
+<span class="c">#/ }</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Enable TLS, tell where certificates are and tell which
+protocols to avoid due to them being insecure. Again, more of
+a technicality but it makes you more secure.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+vim /etc/dovecot/conf.d/10-ssl.conf
+
+<span class="c">#/ Find and change the following lines:</span>
+<span class="c">#/ ssl = required</span>
+<span class="c">#/</span>
+<span class="c">#/ ssl_cert = &lt;/etc/letsencrypt/live/mx.sneakermail.net/fullchain.pem</span>
+<span class="c">#/ ssl_key = &lt;/etc/letsencrypt/live/mx.sneakermail.net/privkey.pem</span>
+<span class="c">#/</span>
+<span class="c">#/ ssl_protocols = !SSLv2 !SSLv3</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Restart dovecot and everything's in place.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+dovecot -n
+systemctl restart dovecot
+
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Configure OpenDKIM</h1>
+
+</td><td class=code><div class=highlight><pre>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Install OpenDKIM</p>
+
+</td><td class=code><div class=highlight><pre>
+
+apt install opendkim opendkim-tools
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Generate your private and public key. Keep your private key safe!</p>
+
+</td><td class=code><div class=highlight><pre>
+mkdir -p /etc/opendkim
+<span class="nb">cd</span> /etc/opendkim
+
+opendkim-genkey -b 2048 -d sneakermail.net -s sneakermail.net.dkim
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Configure <code>opendkim</code>.</p>
+
+</td><td class=code><div class=highlight><pre>
+cat <span class="s">&lt;&lt; EOF &gt; /etc/opendkim.conf</span>
+<span class="s">Syslog yes</span>
+
+<span class="s">Selector mail</span>
+<span class="s">Mode sv</span>
+<span class="s">SubDomains yes</span>
+<span class="s">AutoRestart yes</span>
+<span class="s">Background yes</span>
+<span class="s">Canonicalization relaxed/relaxed</span>
+<span class="s">DNSTimeout 5</span>
+<span class="s">SignatureAlgorithm rsa-sha256</span>
+<span class="s">X-Header yes</span>
+<span class="s">Logwhy yes</span>
+
+<span class="s">InternalHosts /etc/opendkim/internalhosts</span>
+<span class="s">KeyTable /etc/opendkim/keytable</span>
+<span class="s">SigningTable refile:/etc/opendkim/signtable</span>
+
+<span class="s">OversignHeaders From</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>opendkim</code> which key signs which selector.</p>
+
+</td><td class=code><div class=highlight><pre>
+cat <span class="s">&lt;&lt; EOF &gt; /etc/opendkim/keytable</span>
+<span class="s">mail._domainkey.sneakermail.net sneakermail.net:mail:/etc/opendkim/sneakermail.net.dkim.private</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>opendkim</code> which selector corresponds to which domain.</p>
+
+</td><td class=code><div class=highlight><pre>
+cat <span class="s">&lt;&lt; EOF &gt; /etc/opendkim/signtable</span>
+<span class="s">*@sneakermail.net mail._domainkey.sneakermail.net</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>opendkim</code> where our email is coming from so it knows whether to
+sign it or to check its signature. Remember that when you're connecting
+from your phone it counts as a local send, so you only need to put your
+own mail servers' hostnames here, in this case just one.</p>
+
+</td><td class=code><div class=highlight><pre>
+cat <span class="s">&lt;&lt; EOF &gt; /etc/opendkim/internalhosts</span>
+<span class="s">sneakermail.net</span>
+<span class="s">mx.sneakermail.net</span>
+<span class="s">127.0.0.1/8</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Make <code>opendkim</code> listen on a local port so that <code>postfix</code> can connect to
+it to check and sign messages.</p>
+
+</td><td class=code><div class=highlight><pre>
+cat <span class="s">&lt;&lt;EOF &gt;&gt; /etc/default/opendkim</span>
+<span class="s">SOCKET=&quot;inet:8891@localhost&quot;</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Set the correct permissions on OpenDKIM files</p>
+
+</td><td class=code><div class=highlight><pre>
+
+chown opendkim:opendkim /etc/opendkim -R
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> to sign messages going out, and to check messages
+coming in.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;smtpd_milters = inet:localhost:8891&#39;</span>
+postconf -e <span class="s1">&#39;non_smtpd_milters = inet:localhost:8891&#39;</span>
+postconf -e <span class="s1">&#39;milter_default_action = accept&#39;</span>
+postconf -e <span class="s1">&#39;milter_protocol = 2&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Check the file that <code>opendkim</code> set up for you with the record you must
+include in your dns under <code>mail._domainkey.sneakermail.net</code>. Use only what's
+inside the parenthesis.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+cat /etc/opendkim/sneakermail.net.dikm.txt
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Everything's ready, restart everything.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+systemctl restart opendkim
+systemctl restart postfix
+
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Bonus round</h1>
+
+<p>Some extra stuff that makes your setup slightly better.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> to restrict weird and non existing hostnames from
+sending mail. This is a spam protection.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;smtpd_helo_required = yes&#39;</span>
+postconf -e <span class="s1">&#39;smtpd_helo_restrictions = reject_non_fqdn_helo_hostname,reject_invalid_helo_hostname,reject_unknown_helo_hostname&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> to disable the VRFY command, which is a command
+in the SMTP protocol that you may use to check if an account
+exists on a server. We don't want to expose our accounts.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;disable_vrfy_command = yes&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Give <code>postfix</code> a handful of restrictions to connections that come
+in to drop email. The last two are particularly interesting as they
+will make your server check if the sender is present in any blacklist
+thus eliminating a great deal of spam hosts.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;smtpd_recipient_restrictions = permit_sasl_authenticated,\</span>
+<span class="s1">permit_mynetworks,reject_unauth_destination,reject_invalid_hostname,\</span>
+<span class="s1">reject_non_fqdn_hostname,reject_non_fqdn_sender,reject_non_fqdn_recipient,\</span>
+<span class="s1">reject_unknown_sender_domain,reject_rbl_client sbl.spamhaus.org,reject_rbl_client cbl.abuseat.org&#39;</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Tell <code>postfix</code> to delay rejections to log more information about
+perpetrators. This will make your server spend a little more effort
+on spam messages but you'll be able to glimpse at them in your logs.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+postconf -e <span class="s1">&#39;smtpd_delay_reject = yes&#39;</span>
+
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Configuring mutt</h1>
+
+<p>Mutt is a great client that you can use in the terminal if you
+choose to connect to your server via SSH. You may also use it on
+your local terminal if you wish, but that's up to you.</p>
+
+<p>When using it remotely via SSH, mutt doesn't need <code>dovecot</code> or IMAP4
+simply because as it is already running on the same server where your
+messages are stored it can directly access to them (remember they are
+stored as files).</p>
+
+</td><td class=code><div class=highlight><pre>
+
+cat <span class="s">&lt;&lt;EOF &gt; ~/.muttrc</span>
+<span class="s">set mbox_type=Maildir</span>
+<span class="s">set folder=&quot;~/Maildir&quot;</span>
+<span class="s">set mask=&quot;!^\\.[^.]&quot;</span>
+<span class="s">set mbox=&quot;~/Maildir&quot;</span>
+<span class="s">set record=&quot;+.Sent&quot;</span>
+<span class="s">set postponed=&quot;+.Drafts&quot;</span>
+<span class="s">set spoolfile=&quot;~/Maildir&quot;</span>
+<span class="s">EOF</span>
+
+</pre></div></td></tr><tr><td class=docs>
+
+<p>Now if you want to check your mail upon login you just have to write
+<code>mutt</code>.</p>
+
+</td><td class=code><div class=highlight><pre>
+
+mutt
+
+</pre></div></td></tr><tr><td class=docs>
+
+<h1>Finally</h1>
+
+<p>Remmeber to:</p>
+
+<ul>
+<li>Configure your SPF, DKIM and DMARC records on your DNS!</li>
+<li>Backup your mailbox regularly, it is stored in ~/Mailbox.
+</td><td class=code><div class=highlight><pre>
+
+
+</td><td class=code><div class=highlight><pre>
+</pre></div></td></tr><tr><td class=docs></li>
+</ul>
+
+</pre></div></td></tr><tr><td class=docs>
+</td><td class=code><div class=highlight><pre>
+
+</pre></div></td></tr><tr><td class=docs></td><td class='code'></td></tr>
+    </tbody>
+    </table>
+</div>
+</body>
+</html>
