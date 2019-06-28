@@ -1,15 +1,16 @@
 ---
-version: 2
+version: 2.1
+
 jobs:
   build:
     docker:
-      - image: ruby:2.4
+      - image: ruby:2.6
 
     steps:
       - checkout
       - run:
           name: Install dependencies
-          command: bundle install
+          command: gem update bundler && bundle install
       - run:
           name: Build site
           command: bundle exec jekyll build
@@ -24,21 +25,8 @@ jobs:
     environment:
       NOKOGIRI_USE_SYSTEM_LIBRARIES: true
 
-
-  deploy:
-    docker:
-      - image: garland/aws-cli-docker:1.16.140
-
-    steps:
-      - attach_workspace:
-          at: .site
-      - run:
-          name: Sync to S3 bucket
-          command: aws s3 sync ./_site/ s3://ethereal.io/ --delete
-
 workflows:
   version: 2
   build:
     jobs:
       - build
-      - deploy
