@@ -3,7 +3,7 @@ layout: post
 title: Email me maybe
 date: 2019-06-28 09:41:01 -0000
 description: How to deploy your own email server
-tags: tutorial
+tags: talks tutorial email
 ---
 
 Back in the 9th of May I did a little talk/workshop at [Porto Codes](https://porto.codes/previous.html#2019-05-09) where I talked about the advantages and perils of owning your own email server, the hassles with spam and protecting your domain from being flagged as an origin, and so forth.
